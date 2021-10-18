@@ -1,5 +1,6 @@
 from gurobipy import *
 import time
+from scipy.optimize import linprog
 
 def solve_flow(adj_matrix, initial_flow_value):
 	source, sink = 0, len(adj_matrix)-1

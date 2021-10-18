@@ -50,6 +50,7 @@ def generate_random_graph(nvertices,nedges):
 		adj_matrix[v].append(u)
 	return adj_matrix
 
+
 def random_resistant(edge_list,min,max):
 	resistants = {}
 	for (u,v) in edge_list:
