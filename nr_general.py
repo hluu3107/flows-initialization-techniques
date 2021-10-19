@@ -78,26 +78,28 @@ def lngp(nodes,edges,outflow):
 	m.optimize()
 	return m.getAttr('x',flows)
 
-def lnpg2(nodes,edges,outflow):
-	
-	bound = sum(outflow[key] for key in outflow if outflow[key]>0)
+def lnpg2(nodes,edges,initflow=1):
+	#bound = sum(outflow[key] for key in outflow if outflow[key]>0)
 	epsilon = 1e-4
 	print(epsilon)
 	m = Model('netflow2')
 	#m.Params.LogToConsole = 0
 	#vars
-	flows = m.addVars(edges,name="flows",lb = -bound, ub = bound)
+	flows = m.addVars(edges,name="flows",lb = 0, ub = initflow)
+	inflow = m.addVar(name="inflow",lb = -initflow, ub = 0)
+	consumption = {0: inflow, len(nodes)-1: -inflow}
+
 	#aux vars for abs
 	absflows = m.addVars(edges,name="absflows")
 	#flow conservations constraints
-	flows_conservation2 = {v: m.addConstr(flows.sum(v, '*') == outflow.get(v, 0) + flows.sum('*', v)) for v in nodes}
-	#max abs constrains
+	flows_conservation2 = {v: m.addConstr(flows.sum(v, '*') == comsumption.get(v, 0) + flows.sum('*', v)) for v in nodes}
+	#min flow epsilon on every edge constrains
 	for (u,v) in edges:
 		#m.addConstr(maxflow >= flows[u,v]) 
 		m.addConstr(absflows[u,v]== abs_(flows[u,v]))
 		m.addConstr(absflows[u,v] >= epsilon) 
 
-	m.setObjective(quicksum(absflows), GRB.MINIMIZE)
+	m.setObjective(inflow, GRB.MINIMIZE)
 	m.update()
 	m.optimize()
 	return m.getAttr('x',flows)
@@ -141,7 +143,6 @@ def genGraph(minn,maxn, q):
 	return G, adj_matrix, A, lookup
 
 def init2(G,lookup, source,target, initflow=1):
-	epsilon = initflow*1e-6
 	all_paths = list(nx.all_simple_paths(G,source,target,cutoff=G.number_of_nodes()//2))
 	shortest = list(nx.bidirectional_shortest_path(G,source,target))
 	#other_paths = all_paths.difference(sps)
@@ -179,6 +180,27 @@ def init2(G,lookup, source,target, initflow=1):
 			else:
 				psi[lookup[(v,u)]] -= other_value
 	return psi
+
+def init3(nodes, edges, outflow):
+	bound = sum(outflow[key] for key in outflow if outflow[key]>0)
+	m = Model('netflow')
+	m.Params.LogToConsole = 0
+	#vars
+	flows = m.addVars(edges,name="flows",lb = -bound, ub = bound)
+	pressures = m.addVars(nodes, name="pressures", lb = 0)
+	#aux vars for abs
+	#absflows = m.addVars(edges,name="absflows")
+
+	#flow conservations constraints
+	flows_conservation = {v: m.addConstr(flows.sum(v, '*') == outflow.get(v, 0) + flows.sum('*', v)) for v in nodes}
+	#pressure constrains
+	pressure_constrains = {(u,v): m.addConstr(flows[(u,v)] == pressures[u]-pressures[v]) for (u,v) in edges}
+	outlet_pressure = m.addConstr(pressures[len(nodes)-1] == 0)
+	
+	m.setObjective(0, GRB.MINIMIZE)
+	m.update()
+	m.optimize()
+	return m.getAttr('x',flows)
 
 
 def main():
